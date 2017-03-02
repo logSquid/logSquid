@@ -1,0 +1,14 @@
+[Unit]
+Description=logSquid Server
+Documentation=man:logsquid_server
+After=network.target mysql.service mariadb.service
+
+[Service]
+Type=simple
+User=logsquid
+Group=logsquid
+ExecStart=/usr/local/bin/logsquid_server
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

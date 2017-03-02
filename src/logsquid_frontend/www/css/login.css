@@ -1,0 +1,62 @@
+/* 
+    Created on : 07/03/2016, 17:42:47
+    Author     : Mauro Marssola
+*/
+
+body{
+    background: url("../img/background.png") no-repeat center center fixed; 
+    -webkit-background-size: cover;
+    -moz-background-size: cover;
+    -o-background-size: cover;
+    background-size: cover;
+}
+
+.container-login{
+    position: relative;
+    width: 370px;
+    top: 20%;
+    background: #fff;
+    border: solid 1px #333;
+    border-radius: 3px;
+    box-shadow: 0px 15px 15px -10px #000;
+    padding: 20px;
+}
+
+.area-logo-login{
+    position: relative;
+    text-align: center;
+}
+
+input, button{
+    border-radius: 3px !important;
+}
+
+.form-signin .form-control {
+    margin: 10px 0px;
+    height: 40px;
+    font-size: 1.2em;
+    box-shadow: 0 5px 8px -5px #333;
+}
+
+form#login {
+    padding: 10px 0px;
+}
+
+.card.card-container {
+    padding: 20px 10px;
+}
+
+.area-forgot-password{
+    text-align: right;
+}
+.btn-signin:before {
+    content: "\f090";
+    font-family: FontAwesome;
+    font-style: normal;
+    font-weight: normal;
+    text-decoration: inherit;
+    color: #fff;
+    font-size: 18px;
+    padding-right: 0.5em;
+    float: right;
+}

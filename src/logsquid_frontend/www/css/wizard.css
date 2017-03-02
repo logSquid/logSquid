@@ -1,0 +1,62 @@
+/* 
+    Created on : 18/11/2016, 16:02:23
+    Author     : Mauro Marssola
+*/
+
+body{
+    background: #efefef;
+}
+
+.container-wizard{
+    position: relative;
+    width: 700px;
+    top: 5%;
+    padding: 20px;
+}
+.content-wizard{
+    position: relative;
+    margin: 20px 5px 0px 5px;
+    padding: 10px 20px;
+    border-radius: 3px;
+    box-shadow: 0px 30px 30px -32px #333;
+    border: solid 1px #ddd;
+    background: #fff;
+}
+.area-logo-wizard{
+    position: relative;
+}
+
+.cont-wizard {
+    position: relative;
+    top: 15px;
+}
+
+.wizard-logs {
+    font-size: 1em;
+    text-transform: uppercase;
+    color: #666;
+    margin: 25px 0px;
+}
+
+span.glyphicon-ok.check {
+    padding: 0px 20px;
+    color: #1e8200;
+}
+
+span.glyphicon-repeat.check{
+    padding: 0px 20px;
+    color: #3366ff;
+}
+
+span.glyphicon-remove.check {
+    padding: 0px 20px;
+    color: #820000;
+}
+
+span.loading-area{
+    padding: 0px 18px;
+}
+
+span.loading-area img{
+    width: 16px;
+}

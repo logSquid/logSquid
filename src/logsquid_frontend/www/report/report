@@ -1,0 +1,1434 @@
+#! /usr/bin/env python2.7
+# -*- coding:utf-8 -*-
+__author__ = 'Mauro Marssola'
+
+import MySQLdb
+import math
+import sys
+import os.path
+import gc
+from datetime import date
+import calendar
+from xml.dom import minidom
+import ConfigParser
+
+class Report:
+    conffile = "/usr/share/logSquid/frontend/logsquid_frontend.conf"
+    cursor = ""
+    con = ""
+    date = ""
+    row = {}
+    count = ""
+    limit = ""
+    start = ""
+    end = ""
+    mime = {}
+    destination = {}
+    adestination = {}
+    ddestination = {}
+    size = {}
+    detsize = {}
+    url = {}
+    aurl = {}
+    adownload = {}
+    ddownload = {}
+    durl = {}
+    ipdest = {}
+    macaddress = {}
+    status = {}
+    ipuser = {}
+    aipuser = {}
+    dipuser = {}
+    qualquermerda = {}
+    username = {}
+    ausername = {}
+    dusername = {}
+    destpip = {}
+    sitespip = {}
+    destpusername = {}
+    sitespusername = {}
+    band = {}
+    daysmonth = 0
+    MonthYear = ""
+    extensions = {"7z", "aac", "ace", "aif", "aifc", "asf", "ar", "arj", "au", "avi", "bat", "bin", "bz2", "bzip", "cab", "cbz", "com", "cpio", "deb", "dll", "doc", "docm", "docx", "dot", "dotx", "dwg", "ear", "eps", "exe", "fla", "gz", "gzip", "gtar", "iso", "jar", "lha", "lz", "lzh", "lzma", "lzo", "mdb", "mid", "mmp", "mov", "movie", "mp3", "mpe", "mpeg", "mpg", "mso", "nrg", "odp", "ods", "odt", "ogg", "ole", "pdf", "pps", "ppt", "pptx", "qt", "rar", "reg", "rm", "rpm", "rtf", "shar", "shs", "snd", "sql", "src", "sys", "sxc", "sxd", "sxw", "swf", "tar", "tgz", "txz", "vcd", "vob", "xls", "xlsx", "xml", "xz", "war", "wma", "wmv", "zip"}
+
+    def __init__(self):
+        if os.path.isfile(self.conffile):
+            config = ConfigParser.ConfigParser()
+            config.read(self.conffile)
+
+            if config.get("Database", "database") == None:
+                self.database = "logSquid"
+            else:
+                self.database = config.get("Database", "database")
+
+            if config.get("Database", "hostname") == None:
+                self.host = "localhost"
+            else:
+                self.host = config.get("Database", "hostname")
+
+            if config.get("Database", "username") == None:
+                self.username = "logsquid"
+            else:
+                self.username = config.get("Database", "username")
+
+            if config.get("Database", "password") == None:
+                self.password = "logsquid"
+            else:
+                self.password = config.get("Database", "password")
+
+            self.con = MySQLdb.connect(user=self.username, passwd=self.password, host=self.host, db=self.database)
+            self.cursor = self.con.cursor(MySQLdb.cursors.DictCursor)
+        else:
+            print "Arquivo de configuração %s não foi encontrado." % self.conffile
+            quit()
+
+    @staticmethod
+    def convertSize(si):
+        if si == 0 or si == {}:
+            return '0B'
+        label = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+        i = int(math.floor(math.log(si, 1024)))
+        p = math.pow(1024, i)
+        s = round(si / p, 2)
+        if (s > 0):
+            return '%s %s' % (s, label[i])
+        else:
+            return '0B'
+
+    @staticmethod
+    def getSiteofUrl(str):
+        site = str.split("/")
+        if "http:" == site[0] or "https:" == site[0]:
+            return site[2]
+        elif "http:" != site[0]:
+            return site[0]
+
+    def select(self, day=None):
+        if day == None:
+            day = "01"
+        w = "where datetime BETWEEN '%s-%s-%s 00:00:00' and '%s-%s-%s 23:59:59'" % (self.MonthYear[1], self.MonthYear[0], day, self.MonthYear[1], self.MonthYear[0], day)
+        f = "ipuser,username,url,size,mime,status"
+        t = "logSquid"
+
+        self.cursor.execute("""SELECT COUNT(*) as count FROM %s %s""" % (t, w))
+        nlimit = 100000
+        self.count = (self.cursor.fetchall()[0]['count'])
+
+        if self.count < nlimit:
+            self.cursor.execute("""SELECT %s FROM %s %s""" % (f, t, w))
+            self.row = self.cursor.fetchall()
+
+            self.addDownloads()
+            self.addASitesIpUsername()
+            self.addIpuser()
+            self.addUsername()
+            self.addSize()
+            self.addBand()
+            self.clearSelect()
+        else:
+            lines = self.count / nlimit
+            for i in xrange(1, lines + 1):
+                qlimit = nlimit * i
+                self.limit = "LIMIT %s, %s" % (qlimit, nlimit)
+                self.cursor.execute("""SELECT %s FROM %s %s %s""" % (f, t, w, self.limit))
+                self.row = self.cursor.fetchall()
+
+                self.addDownloads()
+                self.addASitesIpUsername()
+                self.addIpuser()
+                self.addUsername()
+                self.addSize()
+                self.addBand()
+                self.clearSelect()
+
+    def manageSelect(self):
+        i = int(1)
+        if len(self.MonthYear) == 3:
+            self.date = self.MonthYear[0]+"-"+self.MonthYear[1]+"-"+self.MonthYear[2]
+            self.daysmonth = int(self.MonthYear[2])
+            i = int(self.MonthYear[2])
+        else:
+            self.date = self.MonthYear[0]+"-"+self.MonthYear[1]
+            self.daysmonth = int(calendar.monthrange(int(self.MonthYear[1]), int(self.MonthYear[0]))[1])
+
+        for x in range(i, (self.daysmonth+1)):
+            self.select(x)
+
+        self.addDownloadsList()
+        self.addASitesIpUsernameList()
+        self.addIpuserList()
+        self.addUsernameList()
+
+        self.fullaDownloads()
+        self.fulldDownloads()
+        self.fullaDestination()
+        self.fulldDestination()
+        self.fullaIpuser()
+        self.fulldIpuser()
+        self.fullaUsername()
+        self.fulldUsername()
+        self.fullBand()
+
+    def addDownloads(self):
+        if len(self.row) > 0:
+            for row in self.row:
+                file = row['url'].split(".")
+		#print row['url'], row['status']
+                status = row['status'].split("/")
+                if status[1] != "403":
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['url'] in self.adownload:
+                            self.adownload.get(row['url']).update({'total': self.adownload.get(row['url']).get('total') + 1, 'size': self.adownload.get(row['url']).get('size') + row['size']})
+                            if row['ipuser'] in self.adownload.get(row['url']).get('ipuser'):
+                                self.adownload.get(row['url']).get('ipuser').get(row['ipuser']).update({'total': self.adownload.get(row['url']).get('ipuser').get(row['ipuser']).get('total') + 1, 'size': self.adownload.get(row['url']).get('ipuser').get(row['ipuser']).get('size') + row['size']})
+                            else:
+                                self.adownload.get(row['url']).get('ipuser')[row['ipuser']] = {'total': 1, 'size': row['size']}
+                            if row['username'] in self.adownload.get(row['url']).get('username'):
+                                self.adownload.get(row['url']).get('username').get(row['username']).update({'total': self.adownload.get(row['url']).get('username').get(row['username']).get('total') + 1, 'size': self.adownload.get(row['url']).get('username').get(row['username']).get('size') + row['size']})
+                            else:
+                                self.adownload.get(row['url']).get('username')[row['username']] = {'total': 1, 'size': row['size']}
+                        else:
+                            self.adownload[row['url']] = {
+                                'ipuser': {
+                                    row['ipuser']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                },
+                                'username': {
+                                    row['username']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    },
+                                },
+                                'total': 1,
+                                'size': row['size']
+                            }
+                else:
+                    if file[-1] in self.extensions:
+                        if row['url'] in self.ddownload:
+                            self.ddownload.get(row['url']).update({'total': self.ddownload.get(row['url']).get('total') + 1, 'size':  self.ddownload.get(row['url']).get('size') + row['size']})
+                            if row['ipuser'] in self.ddownload.get(row['url']).get('ipuser'):
+                                self.ddownload.get(row['url']).get('ipuser').get(row['ipuser']).update({'total': self.ddownload.get(row['url']).get('ipuser').get(row['ipuser']).get('total') + 1, 'size': self.ddownload.get(row['url']).get('ipuser').get(row['ipuser']).get('size') + row['size']})
+                            else:
+                                self.ddownload.get(row['url']).get('ipuser')[row['ipuser']] = {'total': 1, 'size': row['size']}
+                            if row['username'] in self.ddownload.get(row['url']).get('username'):
+                                self.ddownload.get(row['url']).get('username').get(row['username']).update({'total': self.ddownload.get(row['url']).get('username').get(row['username']).get('total') + 1, 'size': self.ddownload.get(row['url']).get('username').get(row['username']).get('size') + row['size']})
+                            else:
+                                self.ddownload.get(row['url']).get('username')[row['username']] = {'total': 1, 'size': row['size']}
+                        else:
+                            self.ddownload[row['url']] = {
+                                'ipuser': {
+                                    row['ipuser']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                },
+                                'username': {
+                                    row['username']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    },
+                                },
+                                'total': 1,
+                                'size': row['size']
+                            }
+    def addDownloadsList(self):
+        newlist = []
+        for adownload in self.adownload:
+            nIp = []
+            for ip in self.adownload.get(adownload).get('ipuser'):
+                nIp.append([
+                    self.adownload.get(adownload).get('ipuser').get(ip).get('size'),
+                    ip,
+                    self.adownload.get(adownload).get('ipuser').get(ip).get('total')
+                ])
+            nIp = sorted(nIp)
+            nUser = []
+            for user in self.adownload.get(adownload).get('username'):
+                nUser.append([
+                    self.adownload.get(adownload).get('username').get(user).get('size'),
+                    user,
+                    self.adownload.get(adownload).get('username').get(user).get('total')
+                ])
+            nUser = sorted(nUser)
+            newlist.append([
+                self.adownload.get(adownload).get('size'),
+                self.adownload.get(adownload).get('total'),
+                adownload,
+                reversed(nIp),
+                reversed(nUser)
+            ])
+        self.adownload = sorted(newlist)
+
+        newlist = []
+        for ddowload in self.ddownload:
+            nIp = []
+            for ip in self.ddownload.get(ddowload).get('ipuser'):
+                nIp.append([
+                    self.ddownload.get(ddowload).get('ipuser').get(ip).get('size'),
+                    ip,
+                    self.ddownload.get(ddowload).get('ipuser').get(ip).get('total')
+                ])
+            nIp = sorted(nIp)
+            nUser = []
+            for user in self.ddownload.get(ddowload).get('username'):
+                nUser.append([
+                    self.ddownload.get(ddowload).get('username').get(user).get('size'),
+                    user,
+                    self.ddownload.get(ddowload).get('username').get(user).get('total')
+                ])
+            nUser = sorted(nUser)
+            newlist.append([
+                self.ddownload.get(ddowload).get('size'),
+                self.ddownload.get(ddowload).get('total'),
+                ddowload,
+                reversed(nIp),
+                reversed(nUser)
+            ])
+        self.ddownload = sorted(newlist)
+
+    def addMime(self):
+        for row in self.row:
+            mime = row['mime'].split("/")
+            if mime[1:] != []:
+                type = mime[0]
+                file = mime[1]
+                if type in self.mime:
+                    if file in self.mime[type]:
+                        self.mime[type][file] += 1
+                    else:
+                        self.mime[type][file] = 1
+                else:
+                    self.mime[type] = {file: 1}
+
+    def addASitesUsername(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            if status[1] != "403":
+                if self.getSiteofUrl(row['url']) in self.adestination:
+                    self.adestination.get(self.getSiteofUrl(row['url'])).update(
+                        {'total': self.adestination.get(self.getSiteofUrl(row['url'])).get('total') + 1})
+                    if row['ipuser'] not in self.adestination.get(self.getSiteofUrl(row['url'])).get('ips'):
+                        self.adestination.get(self.getSiteofUrl(row['url'])).get('ips').update({row['ipuser']})
+                    if row['username'] not in self.adestination.get(self.getSiteofUrl(row['url'])).get('users'):
+                        self.adestination.get(self.getSiteofUrl(row['url'])).get('users').update({row['username']})
+                else:
+                    self.adestination[self.getSiteofUrl(row['url'])] = {
+                        'total': 1,
+                        'ips': {
+                            row['ipuser']
+                        },
+                        'users': {row['username']}
+                    }
+            elif status[1] == "403":
+                if self.getSiteofUrl(row['url']) in self.ddestination:
+                    self.ddestination.get(self.getSiteofUrl(row['url'])).update(
+                        {'total': self.ddestination.get(self.getSiteofUrl(row['url'])).get('total') + 1})
+                    if row['ipuser'] not in self.ddestination.get(self.getSiteofUrl(row['url'])).get('ips'):
+                        self.ddestination.get(self.getSiteofUrl(row['url'])).get('ips').update({row['ipuser']})
+                    if row['username'] not in self.ddestination.get(self.getSiteofUrl(row['url'])).get('users'):
+                        self.ddestination.get(self.getSiteofUrl(row['url'])).get('users').update({row['username']})
+                else:
+                    self.ddestination[self.getSiteofUrl(row['url'])] = {
+                        'total': 1,
+                        'ips': {
+                            row['ipuser']
+                        },
+                        'users': {row['username']}
+                    }
+    def addASitesUsernameList(self):
+        newlist = []
+        for dest in self.adestination:
+            newlist.append([
+                self.adestination.get(dest).get('total'),
+                dest,
+                {'ips': self.adestination.get(dest).get('ips')},
+                {'users': self.adestination.get(dest).get('users')}
+            ])
+        self.adestination = sorted(newlist)
+
+        newlist = []
+        for denied in self.ddestination:
+            newlist.append([
+                self.ddestination.get(denied).get('total'),
+                denied,
+                {'ips': self.ddestination.get(denied).get('ips')},
+                {'users': self.ddestination.get(denied).get('users')}
+            ])
+        self.ddestination = sorted(newlist)
+
+    def addBand(self):
+        for row in self.row:
+            mime = row['mime'].split("/")
+            if mime[1:] != []:
+                file = mime[1]
+            else:
+                file = '-'
+            if mime[0] in self.band:
+                if file in self.band.get(mime[0]):
+                    if row['url'] in self.band.get(mime[0]).get(file).get('url'):
+                        self.band.get(mime[0]).get(file).update(
+                            {'size': self.band.get(mime[0]).get(file).get('size') + row['size']})
+                        self.band.get(mime[0]).get(file).get('url').get(row['url']).update({
+                                'total': self.band.get(mime[0]).get(file).get('url').get(row['url']).get('total') + 1,
+                                'size': self.band.get(mime[0]).get(file).get('url').get(row['url']).get('size') + row['size']
+                            })
+                    else:
+                        self.band.get(mime[0]).get(file).update(
+                            {'total': self.band.get(mime[0]).get(file).get('total') + 1})
+                        self.band.get(mime[0]).get(file).update(
+                            {'size': self.band.get(mime[0]).get(file).get('size') + row['size']})
+                        self.band.get(mime[0]).get(file).get('url').update({
+                            row['url']: {
+                                'total': 1,
+                                'size': row['size']
+                            }
+                        })
+                else:
+                    self.band.get(mime[0]).update({file:
+                        {
+                            'total': 1,
+                            'size': row['size'],
+                            'url': {
+                                row['url']: {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            }
+                        }
+                    })
+            else:
+                self.band[mime[0]] = {
+                    file: {
+                        'total': 1,
+                        'size': row['size'],
+                        'url': {
+                            row['url']: {
+                                'total': 1,
+                                'size': row['size']
+                            }
+                        }
+                    }
+                }
+
+    def addSize(self):
+        for row in self.row:
+            if self.size == {}:
+                self.size = row['size']
+            else:
+                self.size += row['size']
+        return
+
+    def addUrl(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            if status[1] != "403" or status[0] != "TCP_DENIED":
+                if row['url'] in self.aurl:
+                    self.aurl[row['url']] += 1
+                else:
+                    self.aurl[row['url']] = 1
+            if status[1] == "403" or status[0] == "TCP_DENIED":
+                if row['url'] in self.durl:
+                    self.durl[row['url']] += 1
+                else:
+                    self.durl[row['url']] = 1
+    def addUrlList(self):
+        newlist = []
+        for url in self.aurl:
+            newlist.append([self.aurl[url], url])
+        self.aurl = sorted(newlist)
+        newlist = []
+        for url in self.durl:
+            newlist.append([self.durl[url], url])
+        self.durl = sorted(newlist)
+
+    def addAUrlIpUsername(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            if status[1] != "403":
+                if self.getSiteofUrl(row['url']) in self.aurl:
+                    self.aurl.get(self.getSiteofUrl(row['url'])).update(
+                        {'total': self.aurl.get(self.getSiteofUrl(row['url'])).get('total') + 1})
+                    if row['ipuser'] not in self.aurl.get(self.getSiteofUrl(row['url'])).get('ips'):
+                        self.aurl.get(self.getSiteofUrl(row['url'])).get('ips').update({row['ipuser']})
+                    if row['username'] not in self.aurl.get(self.getSiteofUrl(row['url'])).get('users'):
+                        self.aurl.get(self.getSiteofUrl(row['url'])).get('users').update({row['username']})
+                else:
+                    self.aurl[self.getSiteofUrl(row['url'])] = {
+                        'total': 1,
+                        'ips': {
+                            row['ipuser']
+                        },
+                        'users': {row['username']}
+                    }
+            elif status[1] == "403":
+                if self.getSiteofUrl(row['url']) in self.durl:
+                    self.durl.get(self.getSiteofUrl(row['url'])).update(
+                        {'total': self.durl.get(self.getSiteofUrl(row['url'])).get('total') + 1})
+                    if row['ipuser'] not in self.durl.get(self.getSiteofUrl(row['url'])).get('ips'):
+                        self.durl.get(self.getSiteofUrl(row['url'])).get('ips').update({row['ipuser']})
+                    if row['username'] not in self.durl.get(self.getSiteofUrl(row['url'])).get('users'):
+                        self.durl.get(self.getSiteofUrl(row['url'])).get('users').update({row['username']})
+                else:
+                    self.durl[self.getSiteofUrl(row['url'])] = {
+                        'total': 1,
+                        'ips': {
+                            row['ipuser']
+                        },
+                        'users': {row['username']}
+                    }
+    def addAUrlIpUsernameList(self):
+        newlist = []
+        for dest in self.aurl:
+            newlist.append([
+                self.aurl.get(dest).get('total'),
+                dest,
+                {'ips': self.aurl.get(dest).get('ips')},
+                {'users': self.aurl.get(dest).get('users')}
+            ])
+        self.aurl = sorted(newlist)
+
+        newlist = []
+        for denied in self.durl:
+            newlist.append([
+                self.durl.get(denied).get('total'),
+                denied,
+                {'ips': self.durl.get(denied).get('ips')},
+                {'users': self.durl.get(denied).get('users')}
+            ])
+        self.durl = sorted(newlist)
+
+    def addASitesIpUsername(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            file = row['url'].split(".")
+            if row['mime'] == "text/html" or file[-1] in self.extensions:
+                if status[1] != "403":
+                    if self.getSiteofUrl(row['url']) in self.adestination:
+                        self.adestination.get(self.getSiteofUrl(row['url'])).update(
+                            {'total': self.adestination.get(self.getSiteofUrl(row['url'])).get('total') + 1})
+                        if row['ipuser'] not in self.adestination.get(self.getSiteofUrl(row['url'])).get('ips'):
+                            self.adestination.get(self.getSiteofUrl(row['url'])).get('ips').update({row['ipuser']})
+                        if row['username'] not in self.adestination.get(self.getSiteofUrl(row['url'])).get('users'):
+                            self.adestination.get(self.getSiteofUrl(row['url'])).get('users').update({row['username']})
+                    else:
+                        self.adestination[self.getSiteofUrl(row['url'])] = {
+                            'total': 1,
+                            'ips': {
+                                row['ipuser']
+                            },
+                            'users': {row['username']}
+                        }
+                elif status[1] == "403":
+                    if self.getSiteofUrl(row['url']) in self.ddestination:
+                        self.ddestination.get(self.getSiteofUrl(row['url'])).update(
+                            {'total': self.ddestination.get(self.getSiteofUrl(row['url'])).get('total') + 1})
+                        if row['ipuser'] not in self.ddestination.get(self.getSiteofUrl(row['url'])).get('ips'):
+                            self.ddestination.get(self.getSiteofUrl(row['url'])).get('ips').update({row['ipuser']})
+                        if row['username'] not in self.ddestination.get(self.getSiteofUrl(row['url'])).get('users'):
+                            self.ddestination.get(self.getSiteofUrl(row['url'])).get('users').update({row['username']})
+                    else:
+                        self.ddestination[self.getSiteofUrl(row['url'])] = {
+                            'total': 1,
+                            'ips': {
+                                row['ipuser']
+                            },
+                            'users': {row['username']}
+                        }
+    def addASitesIpUsernameList(self):
+        newlist = []
+        for dest in self.adestination:
+            newlist.append([
+                self.adestination.get(dest).get('total'),
+                dest,
+                {'ips': self.adestination.get(dest).get('ips')},
+                {'users': self.adestination.get(dest).get('users')}
+            ])
+        self.adestination = sorted(newlist)
+
+        newlist = []
+        for denied in self.ddestination:
+            newlist.append([
+                self.ddestination.get(denied).get('total'),
+                denied,
+                {'ips': self.ddestination.get(denied).get('ips')},
+                {'users': self.ddestination.get(denied).get('users')}
+            ])
+        self.ddestination = sorted(newlist)
+
+    def addDestination(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            if status[1] != "403":
+                # or status[0] != "TCP_DENIED":
+                if self.getSiteofUrl(row['url']) in self.adestination:
+                    self.adestination[self.getSiteofUrl(row['url'])] += 1
+                else:
+                    self.adestination[self.getSiteofUrl(row['url'])] = 1
+            elif status[1] == "403":
+                if self.getSiteofUrl(row['url']) in self.ddestination:
+                    self.ddestination[self.getSiteofUrl(row['url'])] += 1
+                else:
+                    self.ddestination[self.getSiteofUrl(row['url'])] = 1
+    def addDestinationList(self):
+        newlist = []
+        for dest in self.adestination:
+            newlist.append([self.adestination[dest], dest])
+        self.adestination = sorted(newlist)
+
+        newlist = []
+        for ddest in self.ddestination:
+            newlist.append([self.ddestination[ddest], ddest])
+        self.ddestination = sorted(newlist)
+
+    def addIpuser(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            file = row['url'].split(".")
+            if status[1] != "403":
+                check = 0
+                if row['ipuser'] in self.aipuser:
+                    if row['mime'] == "text/html":
+                        if self.getSiteofUrl(row['url']) in self.aipuser.get(row['ipuser']).get('sites'):
+                            self.aipuser.get(row['ipuser']).get('sites').get(self.getSiteofUrl(row['url'])).update({
+                                'total': self.aipuser.get(row['ipuser']).get('sites').get(self.getSiteofUrl(row['url'])).get('total') + 1,
+                                'size': self.aipuser.get(row['ipuser']).get('sites').get(self.getSiteofUrl(row['url'])).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.aipuser.get(row['ipuser']).get('sites').update({
+                                self.getSiteofUrl(row['url']): {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['url'] in self.aipuser.get(row['ipuser']).get('urls'):
+                            self.aipuser.get(row['ipuser']).get('urls').get(row['url']).update({
+                                'total': self.aipuser.get(row['ipuser']).get('urls').get(row['url']).get('total') + 1,
+                                'size': self.aipuser.get(row['ipuser']).get('urls').get(row['url']).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.aipuser.get(row['ipuser']).get('urls').update({
+                                row['url']: {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                else:
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['ipuser'] in self.aipuser:
+                            self.aipuser.get(row['ipuser']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.aipuser[row['ipuser']] = {
+                                'total': 0,
+                                'size': 0,
+                                'sites': {},
+                                'urls': {}
+                            }
+                            self.aipuser.get(row['ipuser']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                    if row['mime'] == "text/html":
+                        if row['ipuser'] in self.aipuser:
+                            self.aipuser.get(row['ipuser']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.aipuser[row['ipuser']] = {
+                                'total': 0,
+                                'size': 0,
+                                'sites': {},
+                                'urls': {}
+                            }
+                            self.aipuser.get(row['ipuser']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.aipuser.get(row['ipuser']).update({
+                                    'total': self.aipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.aipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+
+            if status[1] == "403":
+                check = 0
+                if row['ipuser'] in self.dipuser:
+                    if row['mime'] == "text/html":
+                        if self.getSiteofUrl(row['url']) in self.dipuser.get(row['ipuser']).get('sites'):
+                            self.dipuser.get(row['ipuser']).get('sites').get(self.getSiteofUrl(row['url'])).update({
+                                'total': self.dipuser.get(row['ipuser']).get('sites').get(self.getSiteofUrl(row['url'])).get('total') + 1,
+                                'size': self.dipuser.get(row['ipuser']).get('sites').get(self.getSiteofUrl(row['url'])).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.dipuser.get(row['ipuser']).update({
+                                    'total': self.dipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.dipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.dipuser.get(row['ipuser']).get('sites').update({
+                                self.getSiteofUrl(row['url']): {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.dipuser.get(row['ipuser']).update({
+                                    'total': self.dipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.dipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['url'] in self.dipuser.get(row['ipuser']).get('urls'):
+                            self.dipuser.get(row['ipuser']).get('urls').get(row['url']).update({
+                                'total': self.dipuser.get(row['ipuser']).get('urls').get(row['url']).get('total') + 1,
+                                'size': self.dipuser.get(row['ipuser']).get('urls').get(row['url']).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.dipuser.get(row['ipuser']).update({
+                                    'total': self.dipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.dipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.dipuser.get(row['ipuser']).get('urls').update({
+                                row['url']: {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.dipuser.get(row['ipuser']).update({
+                                    'total': self.dipuser.get(row['ipuser']).get('total') + 1,
+                                    'size': self.dipuser.get(row['ipuser']).get('size') + row['size']
+                                })
+                                check = 1
+                else:
+                    if row['ipuser'] in self.dipuser:
+                        if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                            self.dipuser.get(row['ipuser']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                        if row['mime'] == "text/html":
+                            self.dipuser.get(row['ipuser']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                    else:
+                        self.dipuser[row['ipuser']] = {
+                            'total': 1,
+                            'size': row['size'],
+                            'sites': {},
+                            'urls': {}
+                        }
+                        if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                            self.dipuser.get(row['ipuser']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                        if row['mime'] == "text/html":
+                            self.dipuser.get(row['ipuser']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+    def addIpuserList(self):
+        nIPs = []
+        for nip in self.aipuser:
+            nSite = []
+            for site in self.aipuser.get(nip).get('sites'):
+                nSite.append([
+                    self.aipuser.get(nip).get('sites').get(site).get('size'),
+                    site,
+                    self.aipuser.get(nip).get('sites').get(site).get('total')
+                ])
+            nSite = sorted(nSite)
+            nUrl = []
+            for url in self.aipuser.get(nip).get('urls'):
+                nUrl.append([
+                    self.aipuser.get(nip).get('urls').get(url).get('size'),
+                    url,
+                    self.aipuser.get(nip).get('urls').get(url).get('total')
+                ])
+            nUrl = sorted(nUrl)
+            nIPs.append([
+                self.aipuser.get(nip).get('size'),
+                self.aipuser.get(nip).get('total'),
+                nip,
+                nSite,
+                nUrl
+            ])
+        self.aipuser = sorted(nIPs)
+
+        nIPs = []
+        for nip in self.dipuser:
+            nSite = []
+            for site in self.dipuser.get(nip).get('sites'):
+                nSite.append([
+                    self.dipuser.get(nip).get('sites').get(site).get('size'),
+                    site,
+                    self.dipuser.get(nip).get('sites').get(site).get('total'),
+                ])
+            nSite = sorted(nSite)
+            nUrl = []
+            for url in self.dipuser.get(nip).get('urls'):
+                nUrl.append([
+                    self.dipuser.get(nip).get('urls').get(url).get('size'),
+                    url,
+                    self.dipuser.get(nip).get('urls').get(url).get('total')
+                ])
+            nUrl = sorted(nUrl)
+            nIPs.append([
+                self.dipuser.get(nip).get('size'),
+                self.dipuser.get(nip).get('total'),
+                nip,
+                nSite,
+                nUrl
+            ])
+        self.dipuser = sorted(nIPs)
+
+    def addUsername(self):
+        for row in self.row:
+            status = row['status'].split("/")
+            file = row['url'].split(".")
+            if status[1] != "403":
+                check = 0
+                if row['username'] in self.ausername:
+                    if row['mime'] == "text/html":
+                        if self.getSiteofUrl(row['url']) in self.ausername.get(row['username']).get('sites'):
+                            self.ausername.get(row['username']).get('sites').get(self.getSiteofUrl(row['url'])).update({
+                                'total': self.ausername.get(row['username']).get('sites').get(self.getSiteofUrl(row['url'])).get('total') + 1,
+                                'size': self.ausername.get(row['username']).get('sites').get(self.getSiteofUrl(row['url'])).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.ausername.get(row['username']).get('sites').update({
+                                self.getSiteofUrl(row['url']): {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['url'] in self.ausername.get(row['username']).get('urls'):
+                            self.ausername.get(row['username']).get('urls').get(row['url']).update({
+                                'total': self.ausername.get(row['username']).get('urls').get(row['url']).get('total') + 1,
+                                'size': self.ausername.get(row['username']).get('urls').get(row['url']).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.ausername.get(row['username']).get('urls').update({
+                                row['url']: {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                else:
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['username'] in self.ausername:
+                            self.ausername.get(row['username']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.ausername[row['username']] = {
+                                'total': 0,
+                                'size': 0,
+                                'sites': {},
+                                'urls': {}
+                            }
+                            self.ausername.get(row['username']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                    if row['mime'] == "text/html":
+                        if row['username'] in self.ausername:
+                            self.ausername.get(row['username']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.ausername[row['username']] = {
+                                'total': 0,
+                                'size': 0,
+                                'sites': {},
+                                'urls': {}
+                            }
+                            self.ausername.get(row['username']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                            if check == 0:
+                                self.ausername.get(row['username']).update({
+                                    'total': self.ausername.get(row['username']).get('total') + 1,
+                                    'size': self.ausername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+
+            if status[1] == "403":
+                check = 0
+                if row['username'] in self.dusername:
+                    if row['mime'] == "text/html":
+                        if self.getSiteofUrl(row['url']) in self.dusername.get(row['username']).get('sites'):
+                            self.dusername.get(row['username']).get('sites').get(self.getSiteofUrl(row['url'])).update({
+                                'total': self.dusername.get(row['username']).get('sites').get(self.getSiteofUrl(row['url'])).get('total') + 1,
+                                'size': self.dusername.get(row['username']).get('sites').get(self.getSiteofUrl(row['url'])).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.dusername.get(row['username']).update({
+                                    'total': self.dusername.get(row['username']).get('total') + 1,
+                                    'size': self.dusername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.dusername.get(row['username']).get('sites').update({
+                                self.getSiteofUrl(row['url']): {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.dusername.get(row['username']).update({
+                                    'total': self.dusername.get(row['username']).get('total') + 1,
+                                    'size': self.dusername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                    if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                        if row['url'] in self.dusername.get(row['username']).get('urls'):
+                            self.dusername.get(row['username']).get('urls').get(row['url']).update({
+                                'total': self.dusername.get(row['username']).get('urls').get(row['url']).get('total') + 1,
+                                'size': self.dusername.get(row['username']).get('urls').get(row['url']).get('size') + row['size']
+                            })
+                            if check == 0:
+                                self.dusername.get(row['username']).update({
+                                    'total': self.dusername.get(row['username']).get('total') + 1,
+                                    'size': self.dusername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                        else:
+                            self.dusername.get(row['username']).get('urls').update({
+                                row['url']: {
+                                    'total': 1,
+                                    'size': row['size']
+                                }
+                            })
+                            if check == 0:
+                                self.dusername.get(row['username']).update({
+                                    'total': self.dusername.get(row['username']).get('total') + 1,
+                                    'size': self.dusername.get(row['username']).get('size') + row['size']
+                                })
+                                check = 1
+                else:
+                    if row['username'] in self.dusername:
+                        if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                            self.dusername.get(row['username']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                        if row['mime'] == "text/html":
+                            self.dusername.get(row['username']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                    else:
+                        self.dusername[row['username']] = {
+                            'total': 1,
+                            'size': row['size'],
+                            'sites': {},
+                            'urls': {}
+                        }
+                        if file[-1] in self.extensions or ":443" in file[-1] and row['size'] >= 1000000:
+                            self.dusername.get(row['username']).update({
+                                'urls': {
+                                    row['url']: {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+                        if row['mime'] == "text/html":
+                            self.dusername.get(row['username']).update({
+                                'sites': {
+                                    self.getSiteofUrl(row['url']): {
+                                        'total': 1,
+                                        'size': row['size']
+                                    }
+                                }
+                            })
+    def addUsernameList(self):
+        nusers = []
+        for nuser in self.ausername:
+            nSite = []
+            for site in self.ausername.get(nuser).get('sites'):
+                nSite.append([
+                    self.ausername.get(nuser).get('sites').get(site).get('size'),
+                    site,
+                    self.ausername.get(nuser).get('sites').get(site).get('total')
+                ])
+            nSite = sorted(nSite)
+            nUrl = []
+            for url in self.ausername.get(nuser).get('urls'):
+                nUrl.append([
+                    self.ausername.get(nuser).get('urls').get(url).get('size'),
+                    url,
+                    self.ausername.get(nuser).get('urls').get(url).get('total')
+                ])
+            nUrl = sorted(nUrl)
+            nusers.append([
+                self.ausername.get(nuser).get('size'),
+                self.ausername.get(nuser).get('total'),
+                nuser,
+                nSite,
+                nUrl
+            ])
+        self.ausername = sorted(nusers)
+        nusers = []
+        for nuser in self.dusername:
+            nSite = []
+            for site in self.dusername.get(nuser).get('sites'):
+                nSite.append([
+                    self.dusername.get(nuser).get('sites').get(site).get('size'),
+                    site,
+                    self.dusername.get(nuser).get('sites').get(site).get('total'),
+                ])
+            nSite = sorted(nSite)
+            nUrl = []
+            for url in self.dusername.get(nuser).get('urls'):
+                nUrl.append([
+                    self.dusername.get(nuser).get('urls').get(url).get('size'),
+                    url,
+                    self.dusername.get(nuser).get('urls').get(url).get('total')
+                ])
+            nUrl = sorted(nUrl)
+            nusers.append([
+                self.dusername.get(nuser).get('size'),
+                self.dusername.get(nuser).get('total'),
+                nuser,
+                nSite,
+                nUrl
+            ])
+        self.dusername = sorted(nusers)
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fullaDestination(self):
+        fsites = open("details/accesssites."+self.date, "w")
+        lines = ""
+        t = len(self.adestination) -1
+        count = 1
+        if t > 0:
+            while t >= 0:
+                lines += "%s | %s | %s | %s\n" % (self.adestination[t][0], self.adestination[t][1], self.getIpAccessSite(t), self.getUserAccessSite(t))
+                t -= 1
+        fsites.writelines(lines)
+        self.adestination = None
+        gc.collect()
+
+    def getIpAccessSite(self, t):
+        ips = "ips: "
+        for ip in self.adestination[t][2].get('ips'):
+            ips += "%s " % ip
+        return ips
+
+    def getUserAccessSite(self, t):
+        users = "users: "
+        for user in self.adestination[t][3].get('users'):
+            users += "%s " % user
+        return users
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fulldDestination(self):
+        fsites = open("details/deniedsites."+self.date, "w")
+        lines = ""
+        t = len(self.ddestination) -1
+        l = 0
+        count = 1
+
+        if t > 0:
+
+            while t >= 0:
+                lines += "%s | %s | %s | %s\n" % (self.ddestination[t][0], self.ddestination[t][1], self.getIPdeniedSites(t), self.getUSERdeniedSites(t))
+                t -= 1
+                count += 1
+        fsites.writelines(lines)
+        self.ddestination = None
+        gc.collect()
+
+    def getIPdeniedSites(self, t):
+        ips = "ips: "
+        for ip in self.ddestination[t][2].get('ips'):
+            ips += "%s " % ip
+        return ips
+
+    def getUSERdeniedSites(self, t):
+        users = "users: "
+        for user in self.ddestination[t][3].get('users'):
+            users += "%s " % user
+        return users
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fullaUrl(self):
+        furl = open("details/accessurl."+self.date, "w")
+        lines = ""
+        t = len(self.aurl) -1
+        l = 0
+        count = 1
+        if t > 0:
+            while t >= 0:
+                lines += "%s | %s | %s | %s\n" % (self.aurl[t][0], self.aurl[t][1], self.getIPaccessUrl(t), self.getUseraccessUrl(t))
+                t -= 1
+                count += 1
+        furl.writelines(lines)
+        self.aurl = None
+        gc.collect()
+
+    def getIPaccessUrl(self, t):
+        ips = "ips: "
+        for ip in self.aurl[t][2].get('ips'):
+            ips += "%s " % ip
+        return ips
+
+    def getUseraccessUrl(self, t):
+        users = "users: "
+        for user in self.aurl[t][3].get('users'):
+            users += "%s " % user
+        return users
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fulldUrl(self):
+        furl = open("details/deniedurl."+self.date, "w")
+        lines = ""
+        t = len(self.durl) -1
+        l = 0
+        count = 1
+        if t > 0:
+            while t >= 0:
+                lines += "%s | %s | %s | %s\n" % (self.durl[t][0], self.durl[t][1], self.getIPdeniedUrl(t), self.getUSERdeniedUrl(t))
+                t -= 1
+                count += 1
+        furl.writelines(lines)
+        self.durl = None
+        gc.collect()
+
+    def getIPdeniedUrl(self, t):
+        ips = "ips: "
+        for ip in self.durl[t][2].get('ips'):
+            ips += "%s " % ip
+        return ips
+
+    def getUSERdeniedUrl(self, t):
+        users = "users: "
+        for user in self.durl[t][3].get('users'):
+            users += "%s "% user
+        return users
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fullaIpuser(self):
+        fip = open("details/aipuser."+self.date, "w")
+        lines = ""
+        for total, size, ip, site, url in reversed(self.aipuser):
+            lines += "%s %s | %s | %s | %s\n" % (total, size, ip, self.getaIpSite(site), self.getaIpUrl(url))
+        fip.writelines(lines)
+        self.aipuser = None
+        gc.collect()
+
+    def getaIpSite(self, site):
+        sites = ""
+        for s in reversed(site):
+            sites += "%s\%s\%s " % (s[0], s[1], s[2])
+        return sites
+
+    def getaIpUrl(self, url):
+        urls = ""
+        for u in reversed(url):
+            urls += "%s\%s\%s " % (u[0], u[1], u[2])
+        return urls
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fulldIpuser(self):
+        fip = open("details/dipuser."+self.date, "w")
+        lines = ""
+        for total, size, ip, site, url in reversed(self.dipuser):
+            lines += "%s %s | %s | %s | %s\n" % (total, size, ip, self.getdIpSite(site), self.getdIpUrl(url))
+        fip.writelines(lines)
+        self.dipuser = None
+        gc.collect()
+
+    def getdIpSite(self, site):
+        sites = ""
+        for s in reversed(site):
+            sites += "%s\%s\%s " % (s[0], s[1], s[2])
+        return sites
+
+    def getdIpUrl(self, url):
+        urls = ""
+        for u in reversed(url):
+            urls += "%s\%s\%s " % (u[0], u[1], u[2])
+        return urls
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fullaDownloads(self):
+        fdownload = open("details/adownloads."+self.date, "w")
+        lines = ""
+        t = len(self.adownload) - 1
+        if t >= 0:
+            while t >= 0:
+                lines +="%s | %s | %s | %s | %s\n" % (self.adownload[t][0], self.adownload[t][1], self.adownload[t][2], self.getaIpDownloads(t), self.getaUserDownloads(t))
+                t -= 1
+        fdownload.writelines(lines)
+        self.adownload = None
+
+    def getaIpDownloads(self, t):
+        ips = "ips:"
+        for ip in self.adownload[t][3]:
+            ips += " %s\%s\%s" % (ip[0], ip[1], ip[2])
+        return ips
+
+    def getaUserDownloads(self, t):
+        users = "users:"
+        for user in self.adownload[t][4]:
+            users += " %s\%s\%s" % (user[0], user[1], user[2])
+        return users
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fulldDownloads(self):
+        fdownload = open("details/ddownloads."+self.date, "w")
+        lines = ""
+        t = len(self.ddownload) - 1
+        if t >= 0:
+            while t >= 0:
+                lines += "%s | %s | %s | %s | %s\n" % (self.ddownload[t][0], self.ddownload[t][1], self.ddownload[t][2], self.getdIpDownloads(t), self.getdUserDownloads(t))
+                t -= 1
+        fdownload.writelines(lines)
+        self.ddownload = None
+        gc.collect()
+
+    def getdIpDownloads(self, t):
+        ips = "ips:"
+        for ip in self.ddownload[t][3]:
+            ips += " %s\%s\%s" % (ip[0], ip[1], ip[2])
+        return ips
+
+    def getdUserDownloads(self, t):
+        users = "users:"
+        for user in self.ddownload[t][4]:
+            users += " %s\%s\%s" % (user[0], user[1], user[2])
+        return users
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fullaUsername(self):
+        fuser = open("details/ausername."+self.date, "w")
+        lines = ""
+        for total, size, user, site, url in reversed(self.ausername):
+            lines += "%s %s | %s | %s | %s\n" % (total, size, user, self.getaUsernameSite(site), self.getaUsernameUrl(url))
+        fuser.writelines(lines)
+        self.ausername = None
+        gc.collect()
+
+    def getaUsernameSite(self, site):
+        sites = ""
+        for s in reversed(site):
+            sites += "%s\%s\%s " % (s[0], s[1], s[2])
+        return sites
+
+    def getaUsernameUrl(self, url):
+        urls = ""
+        for u in reversed(url):
+            urls += "%s\%s\%s " % (u[0], u[1], u[2])
+        return urls
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fulldUsername(self):
+        fuser = open("details/dusername."+self.date, "w")
+        lines = ""
+        for total, size, user, site, url in reversed(self.dusername):
+            lines += "%s %s | %s | %s | %s\n" % (total, size, user, self.getdUsernameSite(site), self.getdUsernameUrl(url))
+        fuser.writelines(lines)
+        self.dusername = None
+        gc.collect()
+
+    def getdUsernameSite(self, site):
+        sites = ""
+        for s in reversed(site):
+            sites += "%s\%s\%s " % (s[0], s[1], s[2])
+        return sites
+
+    def getdUsernameUrl(self, url):
+        urls = ""
+        for u in reversed(url):
+            urls += "%s\%s\%s " % (u[0], u[1], u[2])
+        return urls
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    def fullBand(self):
+        fband = open("details/mime."+self.date, "w")
+        lines = ""
+        for m in self.band:
+            lines += "%s" % m
+            for f in self.band.get(m):
+                lines += " \/ %s\%s\%s |" % (f, self.band.get(m).get(f).get('total'), self.band.get(m).get(f).get('size'))
+                for u in self.band.get(m).get(f).get('url'):
+                    lines += " %s\%s\%s" % (u, self.band.get(m).get(f).get('url').get(u).get('total'), self.band.get(m).get(f).get('url').get(u).get('size'))
+            lines += "\n"
+        fband.writelines(lines)
+        self.band = None
+        gc.collect()
+
+    def clearSelect(self):
+        self.row = {}
+
+    def disconect(self):
+        self.cursor.close()
+        self.con.close()
+        del self.cursor
+        del self.con
+
+now = date.today()
+report = Report()
+
+if len(sys.argv) == 1:
+    MonthYear = str(now.month), str(now.year)
+elif len(sys.argv) == 2:
+    MonthYear = now.month, now.year
+elif len(sys.argv) == 3:
+    MonthYear = str(sys.argv[1]), str(sys.argv[2])
+elif len(sys.argv) == 4:
+    MonthYear = str(sys.argv[1]), str(sys.argv[2]), str(sys.argv[3])
+
+report.MonthYear = MonthYear
+report.manageSelect()
+

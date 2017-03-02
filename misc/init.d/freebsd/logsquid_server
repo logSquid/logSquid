@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# PROVIDE: logsquid_server
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf.local or /etc/rc.conf to
+# enable logsquid_server:
+#
+# logsquid_server_enable (bool): Set to NO by default.  Set it to YES to
+#         enable logsquid_server.
+# logsquid_server_config (string): Set to the standard config file path by
+#         default.
+# logsquid_server_pidfile (string):    Location of the logsquid_agent pid file
+#                               Default is /tmp/logsquid_server.pid
+#
+
+. /etc/rc.subr
+
+name="logsquid_server"
+rcvar=logsquid_server_enable
+
+load_rc_config $name
+
+: ${logsquid_server_enable:=YES}
+: ${logsquid_server_config:=/usr/local/etc/logSquid/${name}.conf}
+: ${logsquid_server_pidfile:=/tmp/${name}.pid}
+
+command="/usr/local/bin/${name}"
+required_files="${logsquid_server_config}"
+
+start_cmd="/usr/sbin/daemon -c -f -p /tmp/${name}.pid ${command}"
+
+run_rc_command "$1"

@@ -1,0 +1,12 @@
+[Unit]
+Description=logSquid Agent
+Documentation=man:logsquid_agent
+After=network.target logsquid_server.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/logsquid_agent
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

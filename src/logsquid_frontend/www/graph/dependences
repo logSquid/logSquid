@@ -1,0 +1,2 @@
+pkg install -y libXpm xproto libXext xextproto libXau libX11 libxcb libXdmcp libxml2 libpthread-stubs kbproto libXt libSM libICE gettext-runtime indexinfo freetype2 pcre png jpeg-turbo t1lib libXaw printproto libXp libXmu
+pkg add -IAfMq php55-gd-5.5.31_1.txz
