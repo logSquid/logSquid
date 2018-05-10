@@ -5,10 +5,6 @@ SET (CMAKE_CXX_COMPILER /usr/bin/clang)
 
 project(logsquid)
 
-if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
-    include_directories(/usr/local/include)
-endif()
-
 file(GLOB LIB_HEADERS_SERVER src/lib/lmysql.c src/lib/services.h)
 file(GLOB LIB_SOURCES_SERVER src/lib/lmysql.c src/lib/services.c)
 
@@ -18,9 +14,19 @@ file(GLOB LIB_SOURCES src/lib/config.c src/lib/daemon.c src/lib/debug.c src/lib/
 file(GLOB SOURCES_SERVER src/${PROJECT_NAME}_server/*.c)
 file(GLOB HEADERS_SERVER src/${PROJECT_NAME}_server/*.h)
 add_executable(${PROJECT_NAME}_server ${SOURCES_SERVER} ${HEADERS_SERVER} ${LIB_SOURCES} ${LIB_HEADERS} ${LIB_SOURCES_SERVER} ${LIB_HEADERS_SERVER})
-target_link_libraries(${PROJECT_NAME}_server pthread mysqlclient gcrypt gpg-error confuse)
+if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+    include_directories(/usr/local/include)
+    target_link_libraries(${PROJECT_NAME}_server pthread mysqlclient gcrypt gpg-error confuse0)
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    target_link_libraries(${PROJECT_NAME}_server pthread mysqlclient gcrypt gpg-error confuse)
+endif()
 
 file(GLOB SOURCES_AGENT src/${PROJECT_NAME}_agent/*.c)
 file(GLOB HEADERS_AGENT src/${PROJECT_NAME}_agent/*.h)
 add_executable(${PROJECT_NAME}_agent ${SOURCES_AGENT} ${HEADERS_AGENT} ${LIB_SOURCES} ${LIB_HEADERS})
-target_link_libraries(${PROJECT_NAME}_agent pthread confuse m)
+if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+    include_directories(/usr/local/include)
+    target_link_libraries(${PROJECT_NAME}_agent pthread confuse0 m)
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    target_link_libraries(${PROJECT_NAME}_agent pthread confuse m)
+endif()
