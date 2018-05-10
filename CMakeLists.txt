@@ -5,6 +5,10 @@ SET (CMAKE_CXX_COMPILER /usr/bin/clang)
 
 project(logsquid)
 
+if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+    include_directories(/usr/local/include)
+endif()
+
 file(GLOB LIB_HEADERS_SERVER src/lib/lmysql.c src/lib/services.h)
 file(GLOB LIB_SOURCES_SERVER src/lib/lmysql.c src/lib/services.c)
 
