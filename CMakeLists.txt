@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
-SET (CMAKE_C_COMPILER /usr/bin/clang-4.0)
-SET (CMAKE_CXX_COMPILER /usr/bin/clang++-4.0)
+SET (CMAKE_C_COMPILER /usr/bin/clang)
+SET (CMAKE_CXX_COMPILER /usr/bin/clang)
 
 project(logsquid)
 
