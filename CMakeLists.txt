@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
 
-SET (CMAKE_C_COMPILER /usr/bin/clang)
-SET (CMAKE_CXX_COMPILER /usr/bin/clang)
+set(CMAKE_C_COMPILER /usr/bin/clang)
+set(CMAKE_CXX_COMPILER /usr/bin/clang)
+set(CMAKE_INSTALL_PREFIX /usr/local)
 
 project(logsquid)
+set(PROJECT_LABEL logSquid)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     include_directories(/usr/local/include)
@@ -25,3 +27,10 @@ file(GLOB SOURCES_AGENT src/${PROJECT_NAME}_agent/*.c)
 file(GLOB HEADERS_AGENT src/${PROJECT_NAME}_agent/*.h)
 add_executable(${PROJECT_NAME}_agent ${SOURCES_AGENT} ${HEADERS_AGENT} ${LIB_SOURCES} ${LIB_HEADERS})
 target_link_libraries(${PROJECT_NAME}_agent pthread confuse m)
+
+
+file(GLOB CONF_FILES conf/${PROJECT_NAME}_agent.conf conf/${PROJECT_NAME}_server.conf)
+
+install(TARGETS ${PROJECT_NAME}_agent ${PROJECT_NAME}_server DESTINATION bin)
+install(FILES ${CONF_FILES} DESTINATION etc/${PROJECT_LABEL})
+install(DIRECTORY DESTINATION /var/log/${PROJECT_LABEL})

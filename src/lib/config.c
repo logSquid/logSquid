@@ -19,13 +19,8 @@ char    *ServerPort = NULL,
         *UsernameDB = NULL, 
         *PasswordDB = NULL,
         *NameDB = NULL,
-        /**PartitionTable = NULL, 
-        *HouseKeeping = NULL, 
-        *HouseKeeping_statistics = NULL,*/
         *Server = NULL, 
-        //*CacheTime = NULL, 
         *PathLog = NULL,
-        //*KeepLog = NULL,
         *ConfFile = NULL,
         *TypeLog = NULL,
         *LogFileSquid = NULL,
@@ -42,9 +37,7 @@ void lgsqd_agent_load(){
     cfg_opt_t agent[] = {
         CFG_SIMPLE_STR("Server", &Server),
         CFG_SIMPLE_STR("ServerPort", &ServerPort),
-        //CFG_SIMPLE_STR("CacheTime", &CacheTime),
         CFG_SIMPLE_STR("PathLog", &PathLog),
-        //CFG_SIMPLE_STR("KeepLog", &KeepLog),
         CFG_SIMPLE_STR("LogFileSquid", &LogFileSquid),
         CFG_SIMPLE_STR("MaxMemoryRead", &MaxMemoryRead),
         CFG_SIMPLE_STR("SleepInterval", &SleepInterval),
@@ -68,13 +61,8 @@ void lgsqd_server_load(){
         CFG_SIMPLE_STR("UsernameDB", &UsernameDB),
         CFG_SIMPLE_STR("PasswordDB", &PasswordDB),
         CFG_SIMPLE_STR("NameDB", &NameDB),
-        /*CFG_SIMPLE_STR("PartitionTable", &PartitionTable),
-        CFG_SIMPLE_STR("HouseKeeping", &HouseKeeping),
-        CFG_SIMPLE_STR("HouseKeeping_statistics", &HouseKeeping_statistics),
-        CFG_SIMPLE_STR("CacheTime", &CacheTime),*/
         CFG_SIMPLE_STR("PathLog", &PathLog),
         CFG_SIMPLE_STR("TypeLog", &TypeLog),
-        //CFG_SIMPLE_STR("KeepLog", &KeepLog),
         CFG_END()
     };
     
