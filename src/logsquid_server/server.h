@@ -27,7 +27,12 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <resolv.h>
-#include <mysql/mysql.h>
+
+#ifdef __APPLE__
+    #include <mysql.h>
+#else
+    #include <mysql/mysql.h>
+#endif
 
 #include "../lib/log.h"
 #include "../lib/debug.h"

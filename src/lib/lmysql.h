@@ -17,7 +17,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <mysql/mysql.h>
+#ifdef __APPLE__
+    #include <mysql.h>
+#else
+    #include <mysql/mysql.h>
+#endif
 #include <time.h>
 
 #include <sys/types.h>
