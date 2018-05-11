@@ -12,7 +12,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     link_directories(/usr/local/lib /usr/local/lib/mysql)
 endif()
 
-file(GLOB LIB_HEADERS_SERVER src/lib/lmysql.c src/lib/services.h)
+file(GLOB LIB_HEADERS_SERVER src/lib/lmysql.h src/lib/services.h)
 file(GLOB LIB_SOURCES_SERVER src/lib/lmysql.c src/lib/services.c)
 
 file(GLOB LIB_HEADERS src/lib/config.h src/lib/daemon.h src/lib/debug.h src/lib/log.h)
