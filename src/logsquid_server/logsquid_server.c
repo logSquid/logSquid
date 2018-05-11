@@ -24,7 +24,7 @@
 #include "server.h"
 #include "../lib/lmysql.h"
 
-pthread_t main_threads[3];
+pthread_t main_threads[2];
 
 int main(int argc, char** argv) {
     
@@ -42,12 +42,12 @@ int main(int argc, char** argv) {
     
     pthread_create(&(main_threads[0]), NULL, waitRequest, NULL);
     pthread_create(&(main_threads[1]), NULL, garbageCollector, NULL);
-    pthread_create(&(main_threads[2]), NULL, Session, NULL);
+    //pthread_create(&(main_threads[2]), NULL, Session, NULL);
     
     
     pthread_join(main_threads[0], NULL);
     pthread_join(main_threads[1], NULL);
-    pthread_join(main_threads[2], NULL);
+    //pthread_join(main_threads[2], NULL);
     
     return (EXIT_SUCCESS);
 }
