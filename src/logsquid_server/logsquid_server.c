@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
     lgsqd_load_config();
     daemon_start();
     
-    StartSession();
+    //StartSession();
     
     createSocket();
     startBind();
