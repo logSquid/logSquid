@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     startBind();
     startListen();
     
-    getAgents();
+    //getAgents();
     
     pthread_create(&(main_threads[0]), NULL, waitRequest, NULL);
     pthread_create(&(main_threads[1]), NULL, garbageCollector, NULL);
