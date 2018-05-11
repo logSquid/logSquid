@@ -32,5 +32,5 @@ target_link_libraries(${PROJECT_NAME}_agent pthread confuse m)
 file(GLOB CONF_FILES conf/${PROJECT_NAME}_agent.conf conf/${PROJECT_NAME}_server.conf)
 
 install(TARGETS ${PROJECT_NAME}_agent ${PROJECT_NAME}_server DESTINATION bin)
-install(FILES ${CONF_FILES} DESTINATION etc/${PROJECT_LABEL})
-install(DIRECTORY DESTINATION /var/log/${PROJECT_LABEL})
+#install(FILES ${CONF_FILES} DESTINATION etc/${PROJECT_LABEL})
+#install(DIRECTORY DESTINATION /var/log/${PROJECT_LABEL})
