@@ -294,6 +294,7 @@ void *writedbAgent(void *id)
         logerror(errno, filename_agent, "server::*writedbAgent");
         host[n].write = 0;
         pthread_cancel(listen_thread[n]);
+        close(filelog_agent);
         return (void*)NULL;
     }
     close(filelog_agent);
@@ -335,7 +336,17 @@ void write_db(int lines, char ip[16], int port)
     if(filelog == NULL)
         logerror(errno, tmpfilename_agent, "server::write_db");
     
-    MYSQL *connection = mysql_init(NULL);
+    int line_bytes = 2400;
+    char get_line[line_bytes];
+
+    while (!feof(filelog))
+    {
+        memset(&get_line, 0, strlen(get_line));
+        fgets(get_line, line_bytes, filelog);
+        printf("line: %s", get_line);
+    }
+
+    /*MYSQL *connection = mysql_init(NULL);
     MYSQL_connect(connection);
     
     int line = 0;
@@ -410,7 +421,7 @@ void write_db(int lines, char ip[16], int port)
 
             if(lines > 0 && lines >= line)
             {
-                line++;
+                ++line;
                 continue;
             }
             char query[2400];
@@ -563,7 +574,7 @@ void write_db(int lines, char ip[16], int port)
     if(remove_stat < 0)
         logerror(errno, statfilename_agent, "server::*writedbAgent");
     
-    mysql_close(connection);
+    mysql_close(connection);*/
     fclose(filelog);
 }
 
